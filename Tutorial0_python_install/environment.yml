@@ -1,0 +1,23 @@
+name: cra_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - xarray
+  - netcdf4
+  - dask
+  - ipython
+  - jupyterlab
+  - intake
+  - intake-esm
+  - aiohttp
+  - fsspec
+  - matplotlib
+  - cartopy
+  - scipy
+  - s3fs
+  - ca-certificates
+  - certifi
+  - openssl
+  - seaborn
+prefix: /Users/bandelol/mambaforge/envs/cra_env
