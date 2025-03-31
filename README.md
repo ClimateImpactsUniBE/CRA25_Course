@@ -45,9 +45,9 @@ If you can already do those things, there is no need for you to be present durin
 
 In this block you figure out what you would like to do in your project and we show you how to download the necessary data. Additionally, we will show you some options on what you can do with your data
 
-- Week 4 (7.4.): Downloading CESM-LENS data & Profiling your code
+- Week 4 (7.4.): Data Analysis
 
-- Week 5 (8.4.): Data Analysis
+- Week 5 (14.4.): Downloading CESM-LENS data & Profiling your code
 
 - (Easter Holiday): You can try downloading the data you need for your project. It may take a while...
 
