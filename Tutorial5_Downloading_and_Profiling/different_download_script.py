@@ -8,20 +8,29 @@ import xarray as xr
 import argparse
 import traceback
 
-def standardize(da: xr.Dataset | xr.DataArray) -> xr.Dataset | xr.DataArray:
+def standardize(da: xr.Dataset | xr.DataArray, minlon, maxlon, minlat, maxlat) -> xr.Dataset | xr.DataArray:
+    da = da.squeeze()
     if "ULONG" in da.coords:
-        import xesmf as xe
-        ds_out = xe.util.grid_global(1, 1)
-        da = da.chunk("auto").reset_coords(["TLONG", "TLAT"], drop=True)
-        regridder = xe.Regridder(da.isel(time=0), ds_out, "bilinear")
-        da = regridder(da)
-        da = da.assign_coords(lon=da.lon[0, :], lat=da.lat[:, 0]).rename({"x": "lon", "y": "lat"})
+        from xarray.groupers import BinGrouper
+        da = da.reset_coords("z_t", drop=True)
+        lat_bins = np.arange(minlat, maxlat + 1, 1)
+        lat_centers = (lat_bins[1:] + lat_bins[:-1]) / 2
+        lon_bins = np.arange(minlon, maxlon + 1, 1)
+        lon_centers = (lon_bins[1:] + lon_bins[:-1]) / 2
+        from xarray.groupers import BinGrouper
+        da = da.groupby(ULONG=BinGrouper(lon_bins, labels=lon_centers), ULAT=BinGrouper(lat_bins, labels=lat_centers)).mean().rename({"ULONG_bins": "lon", "ULAT_bins": "lat"})
+        da = da.assign_coords(lon=(((da.lon + 180) % 360) - 180))
+        da = da.sortby("lon")
     elif (da.lon.max() > 180) and (da.lon.min() >= 0): # we prefer longitude to go from -180 to +180 rather than 0 to 360
         da = da.assign_coords(lon=(((da.lon + 180) % 360) - 180))
         da = da.sortby("lon")
     if "lat" in da.coords and np.diff(da.lat.values)[0] < 0: # and increasing latitudes
         da = da.reindex(lat=da.lat[::-1])
-    return da
+    return (
+        da
+        .sel(lon=slice(minlon, maxlon))
+        .sel(lat=slice(minlat, maxlat))
+    )
 
 # modify from here
 varname = ""
@@ -29,8 +38,8 @@ frequency = ""
 token = ""
 component = "" # for land variables like RAIN, "atm" for atmospheric variables like wind, and "ocn" for ocean variables
 forcing_variant = "cmip6" # other option is "smbb", which stands for "SMoothed Biomass Burning"
-out_path = Path("/Users/bandelol/Documents/code_local/CRA25_Course")
-minlon, maxlon, minlat, maxlat = None, None, 0, 90
+out_path = Path("")
+minlon, maxlon, minlat, maxlat = -175, -165, -15, -5
 levels = None
 # yearbounds need to be multiples of 10 years, starting from 1850 for past, and 2015 for future
 yearbounds = {
@@ -98,16 +107,9 @@ def downloader(period: str, member: str, timebounds: str, odir: Path | str):
     )[varname]
     if component == "ocn":
         "Error probably here, you need to regrid to a regular lon-lat grid using xesmf"
-    ds = (
-        standardize(ds)
-        .squeeze()
-        .sel(lon=slice(minlon, maxlon)) # this will not work with an ocean grid
-        .sel(lat=slice(minlat, maxlat))
-        .chunk("auto")
-    )
+    ds = standardize(ds, (180 + minlon) % 360, (180 + maxlon) % 360, minlat, maxlat).chunk("auto")
     ds = ds.load()
-    for varname in list(ds.data_vars) + ["lat", "lon"]:
-        ds[varname] = ds[varname].astype(np.float32)
+    ds = ds.astype(np.float32)
     ds = ds.to_netcdf(opath)
     return f"Retrieved {member}, {timebounds}"
 
